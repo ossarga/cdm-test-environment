@@ -1,0 +1,137 @@
+version: '3.3'
+
+networks:
+  migration-demo:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.111.0/24
+
+services:
+  dse-5.1:
+    image: datastax/dse-server:5.1.41
+    tty: true
+    privileged: true
+    networks:
+      migration-demo:
+        ipv4_address: 192.168.111.51
+    environment:
+      - DS_LICENSE=accept
+      - ADMIN_ROLE_NAME=dse_admin
+      - ADMIN_ROLE_PASSWORD=dse_admin
+      - SCHEMA_CQL=/schema.cql
+      - TEST_DATA_CQL=/test-data.cql
+      - CASSANDRA_RACKDC_PROPERTIES=/opt/dse/resources/cassandra/conf/cassandra-rackdc.properties
+      - CASSANDRA_RACKDC_PROPERTIES_DC=datacenter1
+      - CASSANDRA_YAML=/opt/dse/resources/cassandra/conf/cassandra.yaml
+      - CASSANDRA_YAML_CLUSTER_NAME=origin
+      - CASSANDRA_YAML_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      - CASSANDRA_YAML_RPC_ADDRESS=0.0.0.0
+      - CASSANDRA_YAML_LISTEN_ADDRESS=192.168.111.51
+      - CASSANDRA_YAML_BROADCAST_ADDRESS=env:CASSANDRA_YAML_LISTEN_ADDRESS
+      - CASSANDRA_YAML_BROADCAST_RPC_ADDRESS=env:CASSANDRA_YAML_LISTEN_ADDRESS
+      - CASSANDRA_YAML_SEEDS=env:CASSANDRA_YAML_LISTEN_ADDRESS
+      - CASSANDRA_YAML_NUM_TOKENS=8
+      - CASSANDRA_YAML_START_RPC=true
+    entrypoint: /entrypoint-wrapper.sh
+    volumes:
+      - ./services/common/entrypoint-wrapper.sh:/entrypoint-wrapper.sh
+      - ./services/common/schema.cql:/schema.cql
+      - ./services/common/scenario-01_test-data_origin.cql:/test-data.cql
+      - ./services/dse-5.1/dse.yaml:/opt/dse/resources/dse/conf/dse.yaml
+
+  dse-6.8:
+    image: datastax/dse-server:6.8.40
+    tty: true
+    privileged: true
+    networks:
+      migration-demo:
+        ipv4_address: 192.168.111.68
+    environment:
+      - DS_LICENSE=accept
+      - ADMIN_ROLE_NAME=dse_admin
+      - ADMIN_ROLE_PASSWORD=dse_admin
+      - SCHEMA_CQL=/schema.cql
+      - CASSANDRA_RACKDC_PROPERTIES=/opt/dse/resources/cassandra/conf/cassandra-rackdc.properties
+      - CASSANDRA_RACKDC_PROPERTIES_DC=datacenter1
+      - CASSANDRA_YAML=/opt/dse/resources/cassandra/conf/cassandra.yaml
+      - CASSANDRA_YAML_CLUSTER_NAME=target
+      - CASSANDRA_YAML_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      - CASSANDRA_YAML_LISTEN_ADDRESS=192.168.111.68
+      - CASSANDRA_YAML_BROADCAST_ADDRESS=env:CASSANDRA_YAML_LISTEN_ADDRESS
+      - CASSANDRA_YAML_NATIVE_TRANSPORT_ADDRESS=0.0.0.0
+      - CASSANDRA_YAML_NATIVE_TRANSPORT_BROADCAST_ADDRESS=env:CASSANDRA_YAML_LISTEN_ADDRESS
+      - CASSANDRA_YAML_SEEDS=env:CASSANDRA_YAML_LISTEN_ADDRESS
+      - CASSANDRA_YAML_NUM_TOKENS=8
+    entrypoint: /entrypoint-wrapper.sh
+    volumes:
+      - ./services/common/entrypoint-wrapper.sh:/entrypoint-wrapper.sh
+      - ./services/common/schema.cql:/schema.cql
+      - ./services/dse-6.8/dse.yaml:/opt/dse/resources/dse/conf/dse.yaml
+
+  cassandra-3.11:
+    image: cassandra:3.11.3
+    tty: true
+    privileged: true
+    networks:
+      migration-demo:
+        ipv4_address: 192.168.111.31
+    environment:
+      - ADMIN_ROLE_NAME=cassandra_admin
+      - ADMIN_ROLE_PASSWORD=cassandra_admin
+      - SCHEMA_CQL=/schema.cql
+      - TEST_DATA_CQL=/test-data.cql
+      - CASSANDRA_RACKDC_PROPERTIES=/etc/cassandra/conf/cassandra-rackdc.properties
+      - CASSANDRA_RACKDC_PROPERTIES_DC=datacenter1
+      - CASSANDRA_YAML=/etc/cassandra/conf/cassandra.yaml
+      - CASSANDRA_YAML_CLUSTER_NAME=cassandra_origin
+      - CASSANDRA_YAML_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      - CASSANDRA_YAML_LISTEN_ADDRESS=192.168.111.31
+      - CASSANDRA_YAML_BROADCAST_ADDRESS=env:CASSANDRA_YAML_LISTEN_ADDRESS
+      - CASSANDRA_YAML_NATIVE_TRANSPORT_ADDRESS=0.0.0.0
+      - CASSANDRA_YAML_NATIVE_TRANSPORT_BROADCAST_ADDRESS=env:CASSANDRA_YAML_LISTEN_ADDRESS
+      - CASSANDRA_YAML_SEEDS=env:CASSANDRA_YAML_LISTEN_ADDRESS
+      - CASSANDRA_YAML_NUM_TOKENS=8
+    entrypoint: /entrypoint-wrapper.sh
+    volumes:
+      - ./services/common/entrypoint-wrapper.sh:/entrypoint-wrapper.sh
+      - ./services/common/schema.cql:/schema.cql
+      - ./services/common/test-data_scenario-01_origin.cql:/test-data.cql
+
+  ossarga-cdm:
+    image: ossarga/cassandra-data-migrator:latest
+    tty: true
+    privileged: true
+    networks:
+      migration-demo:
+        ipv4_address: 192.168.111.13
+    environment:
+      - CDM_PROPERTY_SPARK_CDM_CONNECT_ORIGIN_HOST=192.168.111.51
+      - CDM_PROPERTY_SPARK_CDM_CONNECT_ORIGIN_USERNAME=dse_admin
+      - CDM_PROPERTY_SPARK_CDM_CONNECT_ORIGIN_PASSWORD=dse_admin
+      - CDM_PROPERTY_SPARK_CDM_SCHEMA_ORIGIN_KEYSPACETABLE=test_keyspace.test_table
+      - CDM_PROPERTY_SPARK_CDM_CONNECT_TARGET_USERNAME=dse_admin
+      - CDM_PROPERTY_SPARK_CDM_CONNECT_TARGET_HOST=192.168.111.68
+      - CDM_PROPERTY_SPARK_CDM_SCHEMA_TARGET_KEYSPACETABLE=test_keyspace.test_table
+      - CDM_PROPERTY_SPARK_CDM_FILTER_CASSANDRA_WHERECONDITION=key >= 1
+      - CDM_CREDENTIALS_TARGET_JSON=/opt/cassandra-data-migrator/target_user.json
+      - CDM_LOGGING_LOG4J_ROOTLOGGER=INFO,console,file
+      - CDM_LOGGING_LOG4J_APPENDER_FILE_MAXBACKUPINDEX=5
+      - CDM_DRIVER_MEMORY=1G
+      - CDM_EXECUTOR_MEMORY=1G
+      - CDM_EXECUTION_MODE=manual
+      - CDM_JOB_NAME=migrate
+    volumes:
+      - ./services/ossarga-cdm/target_creds.json:/opt/cassandra-data-migrator/target_user.json
+
+  datastax-cdm:
+    image: datastax/cassandra-data-migrator:4.1.11
+    tty: true
+    privileged: true
+    networks:
+      migration-demo:
+        ipv4_address: 192.168.111.41
+    entrypoint: /bin/bash -c "/bin/tail -f /dev/null"
+    volumes:
+      - ./services/datastax-cdm/cdm-detailed.properties:/assets/cdm-detailed.properties

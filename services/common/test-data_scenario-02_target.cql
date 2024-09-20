@@ -1,0 +1,2 @@
+UPDATE test_keyspace.test_table USING TIMESTAMP 500 SET lst += ['e'], val = 'bar' WHERE key = 1 AND ref = 'a';
+SELECT key, ref, val, lst, WRITETIME(val), WRITETIME(lst) FROM test_keyspace.test_table WHERE key = 1;
