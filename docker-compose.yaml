@@ -38,7 +38,7 @@ services:
     volumes:
       - ./services/common/entrypoint-wrapper.sh:/entrypoint-wrapper.sh
       - ./services/common/schema.cql:/schema.cql
-      - ./services/common/scenario-01_test-data_origin.cql:/test-data.cql
+      - ./services/common/test-data_scenario-01_origin.cql:/test-data.cql
       - ./services/dse-5.1/dse.yaml:/opt/dse/resources/dse/conf/dse.yaml
 
   dse-6.8:
